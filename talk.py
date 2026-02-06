@@ -84,7 +84,9 @@ def main():
     except KeyboardInterrupt:
         print("\nInterrupted.")
     finally:
+        print("Shutting down pipeline...")
         pipeline.stop()
+        print("Done.")
 
 
 if __name__ == "__main__":
