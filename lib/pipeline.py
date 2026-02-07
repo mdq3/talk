@@ -101,7 +101,12 @@ class HailoWhisperPipeline:
         return np.load(file_path)
 
     def _load_tokenizer(self):
-        self.tokenizer = AutoTokenizer.from_pretrained(f"openai/whisper-{self.variant}")
+        # Load from HuggingFace cache without network access to avoid timeout
+        # errors on flaky connections. The tokenizer must have been downloaded
+        # once before (e.g. via: python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('openai/whisper-base')")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            f"openai/whisper-{self.variant}", local_files_only=True
+        )
 
     def _tokenization(self, decoder_input_ids, add_embed=True):
         gather_output = self.token_embedding_weight[decoder_input_ids]
