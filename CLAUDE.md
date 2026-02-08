@@ -59,7 +59,9 @@ The app follows a record → preprocess → encode → decode → clean pipeline
 
 8. **`lib/boost_words.py`** — `load_boost_words()` merges boost config from a JSON file and CLI `--boost` args (CLI overrides file entries).
 
-9. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default.
+9. **`lib/spinner.py`** — Braille-dot loading spinner. `spinner(message)` returns `(done, thread)`; set `done` to stop.
+
+10. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default.
 
 ## Linting
 
