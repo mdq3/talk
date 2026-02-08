@@ -16,11 +16,10 @@ python talk.py --variant tiny.en  # english-only, hailo10h only
 python talk.py --duration 20      # record up to 20 seconds
 python talk.py --boost "Hailo:2.0" --boost "Raspberry:1.5"  # boost specific words
 python talk.py --boost-file custom.json                      # load boost words from file
-python talk.py --chat             # voice chat: STT → LLM → TTS (all on Hailo NPU)
-python talk.py --chat --no-tts    # text-only chat (no voice output)
-python talk.py --chat --llm-model qwen2.5-instruct           # different model
-python talk.py --chat --tts-voice en_GB-alba-medium          # different voice
-python talk.py --chat --system-prompt "You are a pirate."    # custom system prompt
+python talk.py --no-tts           # text-only (no voice output)
+python talk.py --llm-model qwen2.5-instruct                  # different LLM model
+python talk.py --tts-voice en_GB-alba-medium                  # different TTS voice
+python talk.py --system-prompt "You are a pirate."            # custom system prompt
 ```
 
 ## Setup
