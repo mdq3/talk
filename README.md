@@ -51,6 +51,7 @@ pip install /usr/local/hailo/resources/packages/hailort-*-linux_aarch64.whl
 
 ```bash
 pip install -r requirements.txt
+pip install -r requirements-dev.txt  # optional: ruff linter/formatter
 ```
 
 ### 4. Download Whisper model files

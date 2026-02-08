@@ -22,6 +22,12 @@ python talk.py --boost-file custom.json                      # load boost words 
 
 Run `./setup.sh [variant]` to create the venv, install deps, and download models. The HailoRT Python wheel must be installed from `/usr/local/hailo/resources/packages/hailort-*-linux_aarch64.whl` — it is not on PyPI.
 
+For development tools (ruff):
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 ## Architecture
 
 The app follows a record → preprocess → encode → decode → clean pipeline:
