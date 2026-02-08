@@ -2,10 +2,13 @@
 
 import io
 import os
+import queue
 import re
+import threading
 import wave
 from contextlib import redirect_stderr
 from io import StringIO
+from math import gcd
 
 import numpy as np
 import sounddevice as sd
@@ -55,7 +58,12 @@ def clean_text_for_tts(text):
 
 
 class PiperTTS:
-    """Text-to-speech using Piper ONNX models."""
+    """Text-to-speech using Piper ONNX models.
+
+    Keeps a persistent audio stream that continuously feeds silence to the
+    output device, preventing HDMI sink sleep. When speak() is called, the
+    audio data is queued and played without any wake-up delay.
+    """
 
     def __init__(self, model_dir, voice_name=DEFAULT_VOICE):
         onnx_path = f"{model_dir}/{voice_name}.onnx"
@@ -67,6 +75,53 @@ class PiperTTS:
 
         self.voice = _suppress_native_stderr(_load)
         self.native_rate = self.voice.config.sample_rate
+
+        dev = sd.query_devices(kind="output")
+        self.playback_rate = int(dev["default_samplerate"])
+
+        # Compute resampling factors once
+        if self.playback_rate != self.native_rate:
+            divisor = gcd(self.native_rate, self.playback_rate)
+            self._resample_up = self.playback_rate // divisor
+            self._resample_down = self.native_rate // divisor
+        else:
+            self._resample_up = None
+            self._resample_down = None
+
+        # Audio playback via a callback stream that continuously runs.
+        # Feeds silence when idle so the HDMI sink never sleeps.
+        self._audio_queue = queue.Queue()
+        self._audio_buf = np.empty(0, dtype=np.float32)
+        self._done_event = threading.Event()
+        self._stream = sd.OutputStream(
+            samplerate=self.playback_rate,
+            channels=1,
+            dtype="float32",
+            callback=self._audio_callback,
+        )
+        self._stream.start()
+
+    def _audio_callback(self, outdata, frames, time_info, status):
+        """Fill the output buffer from queued audio, or silence if idle."""
+        needed = frames
+        written = 0
+
+        while written < needed:
+            # Drain current buffer
+            if len(self._audio_buf) > 0:
+                chunk = min(len(self._audio_buf), needed - written)
+                outdata[written : written + chunk, 0] = self._audio_buf[:chunk]
+                self._audio_buf = self._audio_buf[chunk:]
+                written += chunk
+            else:
+                # Try to get more audio from the queue
+                try:
+                    self._audio_buf = self._audio_queue.get_nowait()
+                except queue.Empty:
+                    # No audio left — fill remainder with silence
+                    outdata[written:, 0] = 0.0
+                    self._done_event.set()
+                    return
 
     def synthesize(self, text):
         """Synthesize text to a float32 numpy array at the model's native sample rate."""
@@ -92,22 +147,19 @@ class PiperTTS:
         return audio
 
     def speak(self, text):
-        """Synthesize text and play it through the default output device (blocking)."""
+        """Synthesize text and play via the persistent stream (blocking)."""
         audio = self.synthesize(text)
         if len(audio) == 0:
             return
 
-        # Resample to the default output device's sample rate if needed
-        dev = sd.query_devices(kind="output")
-        playback_rate = int(dev["default_samplerate"])
+        if self._resample_up is not None:
+            audio = resample_poly(audio, self._resample_up, self._resample_down).astype(np.float32)
 
-        if playback_rate != self.native_rate:
-            from math import gcd
+        self._done_event.clear()
+        self._audio_queue.put(audio)
+        self._done_event.wait()
 
-            divisor = gcd(self.native_rate, playback_rate)
-            up = playback_rate // divisor
-            down = self.native_rate // divisor
-            audio = resample_poly(audio, up, down).astype(np.float32)
-
-        sd.play(audio, samplerate=playback_rate)
-        sd.wait()
+    def close(self):
+        """Stop and close the audio stream."""
+        self._stream.stop()
+        self._stream.close()
