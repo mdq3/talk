@@ -7,11 +7,11 @@
 #   3. Normalization    — RMS-based gain to bring speech to a consistent level
 #   4. Voice activity   — energy-based detection of where speech starts
 
-from . import audio_utils
-import numpy as np
 import noisereduce as nr
+import numpy as np
 from scipy.signal import butter, sosfilt
 
+from . import audio_utils
 
 # --- Frequency filter ---
 
@@ -32,11 +32,12 @@ def bandpass_filter(audio, sample_rate, low_hz=VOICE_LOW_HZ, high_hz=VOICE_HIGH_
     nyquist = sample_rate / 2.0
     low = low_hz / nyquist
     high = min(high_hz / nyquist, 0.99)  # clamp below Nyquist to avoid filter instability
-    sos = butter(order, [low, high], btype='band', output='sos')
+    sos = butter(order, [low, high], btype="band", output="sos")
     return sosfilt(sos, audio).astype(np.float32)
 
 
 # --- Noise reduction ---
+
 
 def reduce_noise(audio, sample_rate):
     """Remove steady-state background noise using spectral gating.
@@ -71,7 +72,7 @@ def normalize_rms(audio, target_db=TARGET_RMS_DBFS):
     similar energy level. This is much more robust than the previous
     peak-amplitude gain boost.
     """
-    rms = np.sqrt(np.mean(audio ** 2))
+    rms = np.sqrt(np.mean(audio**2))
     if rms < 1e-8:
         # Silence — nothing to normalize
         return audio
@@ -84,6 +85,7 @@ def normalize_rms(audio, target_db=TARGET_RMS_DBFS):
 
 # --- Voice activity detection ---
 
+
 def detect_first_speech(audio_data, sample_rate, threshold=0.2, frame_duration=0.02):
     """Find the timestamp (in seconds) where speech first appears.
 
@@ -95,7 +97,7 @@ def detect_first_speech(audio_data, sample_rate, threshold=0.2, frame_duration=0
         audio_data = np.mean(audio_data, axis=1)
 
     frame_size = int(frame_duration * sample_rate)
-    frames = [audio_data[i:i + frame_size] for i in range(0, len(audio_data), frame_size)]
+    frames = [audio_data[i : i + frame_size] for i in range(0, len(audio_data), frame_size)]
     energy = [np.sum(np.abs(frame) ** 2) / len(frame) for frame in frames]
 
     max_energy = max(energy)
@@ -110,6 +112,7 @@ def detect_first_speech(audio_data, sample_rate, threshold=0.2, frame_duration=0
 
 
 # --- Main audio improvement pipeline ---
+
 
 def improve_input_audio(audio, sample_rate=audio_utils.SAMPLE_RATE, vad=True):
     """Clean up raw microphone audio for better Whisper transcription.
@@ -134,6 +137,7 @@ def improve_input_audio(audio, sample_rate=audio_utils.SAMPLE_RATE, vad=True):
 
 
 # --- Mel spectrogram chunking for Hailo ---
+
 
 def preprocess(audio, is_nhwc=False, chunk_length=10, chunk_offset=0, max_duration=60, overlap=0.0):
     """Split audio into fixed-length chunks and convert to mel spectrograms.

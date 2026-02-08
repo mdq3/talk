@@ -1,10 +1,11 @@
 # Adapted from hailo-apps speech recognition
-import numpy as np
 import os
-from hailo_platform import HEF, VDevice, HailoSchedulingAlgorithm, FormatType
-from transformers import AutoTokenizer
-from queue import Queue, Empty
+from queue import Empty, Queue
 from threading import Thread
+
+import numpy as np
+from hailo_platform import HEF, FormatType, HailoSchedulingAlgorithm, VDevice
+from transformers import AutoTokenizer
 
 from .postprocessing import apply_repetition_penalty, apply_word_boost
 
@@ -53,9 +54,7 @@ def get_hef_paths(variant: str, hw_arch: str) -> tuple:
     try:
         entry = HEF_REGISTRY[variant][hw_arch]
     except KeyError:
-        raise FileNotFoundError(
-            f"HEF not available for model '{variant}' on hardware '{hw_arch}'."
-        )
+        raise FileNotFoundError(f"HEF not available for model '{variant}' on hardware '{hw_arch}'.")
     encoder_path = os.path.join(MODELS_DIR, entry["encoder"])
     decoder_path = os.path.join(MODELS_DIR, entry["decoder"])
     for path in (encoder_path, decoder_path):
@@ -65,7 +64,9 @@ def get_hef_paths(variant: str, hw_arch: str) -> tuple:
 
 
 class HailoWhisperPipeline:
-    def __init__(self, encoder_model_path: str, decoder_model_path: str, variant="base", boost_words=None):
+    def __init__(
+        self, encoder_model_path: str, decoder_model_path: str, variant="base", boost_words=None
+    ):
         self.encoder_model_path = encoder_model_path
         self.decoder_model_path = decoder_model_path
         self.timeout_ms = 100000000
@@ -90,21 +91,23 @@ class HailoWhisperPipeline:
     def _load_token_embedding_weight(self):
         file_path = os.path.join(
             MODELS_DIR,
-            f"decoder_assets/{self.variant}/decoder_tokenization/token_embedding_weight_{self.variant}.npy"
+            f"decoder_assets/{self.variant}/decoder_tokenization/token_embedding_weight_{self.variant}.npy",
         )
         return np.load(file_path)
 
     def _load_onnx_add_input(self):
         file_path = os.path.join(
             MODELS_DIR,
-            f"decoder_assets/{self.variant}/decoder_tokenization/onnx_add_input_{self.variant}.npy"
+            f"decoder_assets/{self.variant}/decoder_tokenization/onnx_add_input_{self.variant}.npy",
         )
         return np.load(file_path)
 
     def _load_tokenizer(self):
         # Load from HuggingFace cache without network access to avoid timeout
         # errors on flaky connections. The tokenizer must have been downloaded
-        # once before (e.g. via: python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('openai/whisper-base')")
+        # once before (e.g. via:
+        #   python -c "from transformers import AutoTokenizer; \
+        #     AutoTokenizer.from_pretrained('openai/whisper-base')")
         self.tokenizer = AutoTokenizer.from_pretrained(
             f"openai/whisper-{self.variant}", local_files_only=True
         )
@@ -143,8 +146,12 @@ class HailoWhisperPipeline:
             decoder_infer_model = vdevice.create_infer_model(self.decoder_model_path)
             encoder_infer_model.input().set_format_type(FormatType.FLOAT32)
             encoder_infer_model.output().set_format_type(FormatType.FLOAT32)
-            decoder_infer_model.input(f"{decoder_model_name}/input_layer1").set_format_type(FormatType.FLOAT32)
-            decoder_infer_model.input(f"{decoder_model_name}/input_layer2").set_format_type(FormatType.FLOAT32)
+            decoder_infer_model.input(f"{decoder_model_name}/input_layer1").set_format_type(
+                FormatType.FLOAT32
+            )
+            decoder_infer_model.input(f"{decoder_model_name}/input_layer2").set_format_type(
+                FormatType.FLOAT32
+            )
 
             for output_name in sorted_output_names:
                 decoder_infer_model.output(output_name).set_format_type(FormatType.FLOAT32)
@@ -169,46 +176,66 @@ class HailoWhisperPipeline:
                             encoded_features = encoder_bindings.output().get_buffer()
 
                             start_token_id = [50258]
-                            decoder_input_ids = np.array(
-                                [[start_token_id[0]]], dtype=np.int64
-                            )
+                            decoder_input_ids = np.array([[start_token_id[0]]], dtype=np.int64)
                             decoder_input_ids = np.concatenate(
-                                [decoder_input_ids, np.zeros((1, self.decoding_sequence_length - 1), dtype=np.int64)],
-                                axis=1
+                                [
+                                    decoder_input_ids,
+                                    np.zeros(
+                                        (1, self.decoding_sequence_length - 1), dtype=np.int64
+                                    ),
+                                ],
+                                axis=1,
                             )
 
                             generated_tokens = []
 
                             for i in range(self.decoding_sequence_length - 1):
-                                tokenized_ids = self._tokenization(decoder_input_ids, add_embed=False)
+                                tokenized_ids = self._tokenization(
+                                    decoder_input_ids, add_embed=False
+                                )
 
-                                decoder_bindings.input(f"{decoder_model_name}/input_layer1").set_buffer(encoded_features)
-                                decoder_bindings.input(f"{decoder_model_name}/input_layer2").set_buffer(tokenized_ids)
+                                decoder_bindings.input(
+                                    f"{decoder_model_name}/input_layer1"
+                                ).set_buffer(encoded_features)
+                                decoder_bindings.input(
+                                    f"{decoder_model_name}/input_layer2"
+                                ).set_buffer(tokenized_ids)
 
                                 buffers = [
-                                    np.zeros(decoder_infer_model.output(name).shape).astype(np.float32)
+                                    np.zeros(decoder_infer_model.output(name).shape).astype(
+                                        np.float32
+                                    )
                                     for name in sorted_output_names
                                 ]
                                 for name, buf in zip(sorted_output_names, buffers):
                                     decoder_bindings.output(name).set_buffer(buf)
 
-                                decoder_configured_infer_model.run([decoder_bindings], self.timeout_ms)
+                                decoder_configured_infer_model.run(
+                                    [decoder_bindings], self.timeout_ms
+                                )
 
                                 decoder_outputs = np.concatenate(
-                                    [decoder_bindings.output(name).get_buffer() for name in useful_outputs],
-                                    axis=2
+                                    [
+                                        decoder_bindings.output(name).get_buffer()
+                                        for name in useful_outputs
+                                    ],
+                                    axis=2,
                                 )
 
                                 repetition_penalty = 1.5
                                 logits = apply_repetition_penalty(
-                                    decoder_outputs[:, i], generated_tokens, penalty=repetition_penalty
+                                    decoder_outputs[:, i],
+                                    generated_tokens,
+                                    penalty=repetition_penalty,
                                 )
                                 if self.boost_token_map:
                                     logits = apply_word_boost(logits, self.boost_token_map)
                                 next_token = np.argmax(logits)
 
                                 generated_tokens.append(next_token)
-                                decoder_input_ids[0][i + 1] = np.array([[next_token]], dtype=np.int64)
+                                decoder_input_ids[0][i + 1] = np.array(
+                                    [[next_token]], dtype=np.int64
+                                )
 
                                 if next_token == self.tokenizer.eos_token_id:
                                     break

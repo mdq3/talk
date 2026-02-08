@@ -1,9 +1,9 @@
 import time
 
-from .pipeline import HailoWhisperPipeline, get_hef_paths
 from .audio_utils import load_audio
-from .preprocessing import preprocess, improve_input_audio
+from .pipeline import HailoWhisperPipeline, get_hef_paths
 from .postprocessing import clean_transcription
+from .preprocessing import improve_input_audio, preprocess
 from .record_utils import record_audio
 
 

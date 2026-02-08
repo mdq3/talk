@@ -8,15 +8,16 @@
 # polyphase filter (resample_poly), which is cleaner than the naive
 # scipy.signal.resample for non-integer rate ratios.
 
-import sounddevice as sd
-import numpy as np
-import scipy.io.wavfile as wav
-from scipy.signal import resample_poly, butter, sosfilt
-from math import gcd
+import queue
 import select
 import sys
-import queue
 import time
+from math import gcd
+
+import numpy as np
+import scipy.io.wavfile as wav
+import sounddevice as sd
+from scipy.signal import butter, resample_poly, sosfilt
 
 TARGET_SAMPLE_RATE = 16000  # Whisper expects 16kHz
 CHANNELS = 1
@@ -24,8 +25,8 @@ CHANNELS = 1
 
 def _get_device_sample_rate():
     """Get the native sample rate of the default input device."""
-    dev = sd.query_devices(kind='input')
-    return int(dev['default_samplerate'])
+    dev = sd.query_devices(kind="input")
+    return int(dev["default_samplerate"])
 
 
 def _anti_alias_and_resample(audio, device_rate, target_rate):
@@ -40,7 +41,7 @@ def _anti_alias_and_resample(audio, device_rate, target_rate):
     # Low-pass at slightly below the new Nyquist to give the filter room
     nyquist = target_rate / 2.0
     cutoff = nyquist * 0.95  # 7600 Hz — just under the 8 kHz Nyquist
-    sos = butter(8, cutoff, btype='low', fs=device_rate, output='sos')
+    sos = butter(8, cutoff, btype="low", fs=device_rate, output="sos")
     audio = sosfilt(sos, audio).astype(np.float32)
 
     # resample_poly needs integer up/down factors
@@ -74,11 +75,10 @@ def record_audio(duration, audio_path):
     print(f"Recording for up to {duration} seconds. Press Enter to stop early...")
 
     start_time = time.time()
-    with sd.InputStream(samplerate=device_rate,
-                        channels=CHANNELS,
-                        dtype="float32",
-                        callback=audio_callback):
-        sys.stdin = open('/dev/stdin')
+    with sd.InputStream(
+        samplerate=device_rate, channels=CHANNELS, dtype="float32", callback=audio_callback
+    ):
+        sys.stdin = open("/dev/stdin")
         while True:
             if time.time() - start_time >= duration:
                 print("Max duration reached.")

@@ -33,7 +33,9 @@ def parse_args():
         default=[],
         help="Boost a word during decoding. Format: word:factor (default factor 1.5). Repeatable.",
     )
-    default_boost_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "boost_words.json")
+    default_boost_file = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "boost_words.json"
+    )
     parser.add_argument(
         "--boost-file",
         type=str,
@@ -46,8 +48,8 @@ def parse_args():
 def main():
     args = parse_args()
 
-    from lib.boost_words import load_boost_words
     from lib.app import run
+    from lib.boost_words import load_boost_words
 
     boost_words = load_boost_words(args.boost_file, args.boost)
     run(args.variant, args.hw_arch, args.duration, boost_words)
