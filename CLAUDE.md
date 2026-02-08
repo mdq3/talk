@@ -55,6 +55,17 @@ The app follows a record → preprocess → encode → decode → clean pipeline
 
 9. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default.
 
+## Linting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting, configured in `pyproject.toml` (Python 3.13, 100-char line length, `E`/`F`/`W`/`I` rules).
+
+```bash
+ruff check .       # lint
+ruff format .      # format
+```
+
+Run both before committing. All code must pass `ruff check` and `ruff format --check`.
+
 ## Hardware Constraints
 
 - USB mic only supports 44100 Hz native — never try to open it at 16 kHz directly (`sounddevice` will raise `paInvalidSampleRate`)
