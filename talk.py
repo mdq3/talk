@@ -3,22 +3,8 @@
 
 import argparse
 import os
-import sys
-from itertools import cycle
-from threading import Event, Thread
 
-SPINNER_CHARS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-
-
-def _loading_spinner(message, done):
-    for char in cycle(SPINNER_CHARS):
-        if done.is_set():
-            break
-        sys.stdout.write(f"\r{char} {message}")
-        sys.stdout.flush()
-        done.wait(0.08)
-    sys.stdout.write(f"\r")
-    sys.stdout.flush()
+from lib.spinner import spinner
 
 
 def parse_args():
@@ -64,15 +50,13 @@ def parse_args():
 def main():
     args = parse_args()
 
-    done = Event()
-    spinner = Thread(target=_loading_spinner, args=("Loading...", done), daemon=True)
-    spinner.start()
+    done, thread = spinner("Loading...")
 
     from lib.app import run
     from lib.boost_words import load_boost_words
 
     done.set()
-    spinner.join()
+    thread.join()
 
     boost_words = load_boost_words(args.boost_file, args.boost)
     run(args.variant, args.hw_arch, args.duration, boost_words)
