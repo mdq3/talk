@@ -44,6 +44,34 @@ def parse_args():
         default=default_boost_file,
         help="Path to JSON file with word boost factors (default: boost_words.json)",
     )
+    parser.add_argument(
+        "--chat",
+        action="store_true",
+        help="Enable chat mode: send transcriptions to an LLM and speak responses via TTS",
+    )
+    parser.add_argument(
+        "--llm-model",
+        type=str,
+        default="qwen2",
+        help="LLM model name from hailo-ollama models (default: qwen2)",
+    )
+    parser.add_argument(
+        "--tts-voice",
+        type=str,
+        default="en_US-amy-medium",
+        help="Piper TTS voice name (default: en_US-amy-medium)",
+    )
+    parser.add_argument(
+        "--no-tts",
+        action="store_true",
+        help="Disable TTS voice output in chat mode (text-only)",
+    )
+    parser.add_argument(
+        "--system-prompt",
+        type=str,
+        default=None,
+        help="Override the default LLM system prompt",
+    )
     return parser.parse_args()
 
 
@@ -55,11 +83,27 @@ def main():
     from lib.app import run
     from lib.boost_words import load_boost_words
 
+    tts = None
+    if args.chat and not args.no_tts:
+        from lib.tts import PiperTTS
+
+        models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "piper")
+        tts = PiperTTS(models_dir, args.tts_voice)
+
     done.set()
     thread.join()
 
     boost_words = load_boost_words(args.boost_file, args.boost)
-    run(args.variant, args.hw_arch, args.duration, boost_words)
+
+    chat_opts = None
+    if args.chat:
+        chat_opts = {
+            "llm_model": args.llm_model,
+            "system_prompt": args.system_prompt,
+            "tts": tts,
+        }
+
+    run(args.variant, args.hw_arch, args.duration, boost_words, chat_opts=chat_opts)
 
 
 if __name__ == "__main__":

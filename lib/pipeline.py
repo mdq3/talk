@@ -63,15 +63,29 @@ def get_hef_paths(variant: str, hw_arch: str) -> tuple:
     return encoder_path, decoder_path
 
 
+def create_shared_vdevice():
+    """Create a VDevice with shared scheduling for multi-model inference."""
+    params = VDevice.create_params()
+    params.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
+    params.group_id = "SHARED"
+    return VDevice(params)
+
+
 class HailoWhisperPipeline:
     def __init__(
-        self, encoder_model_path: str, decoder_model_path: str, variant="base", boost_words=None
+        self,
+        encoder_model_path: str,
+        decoder_model_path: str,
+        variant="base",
+        boost_words=None,
+        vdevice=None,
     ):
         self.encoder_model_path = encoder_model_path
         self.decoder_model_path = decoder_model_path
         self.timeout_ms = 100000000
         self.variant = variant
         self.decoding_sequence_length = None
+        self.vdevice = vdevice
 
         self.token_embedding_weight = self._load_token_embedding_weight()
         self.onnx_add_input = self._load_onnx_add_input()
@@ -132,16 +146,18 @@ class HailoWhisperPipeline:
             return unsqueeze_output
 
     def _inference_loop(self):
-        params = VDevice.create_params()
-        params.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
-        params.group_id = "SHARED"
-
         decoder_hef = HEF(self.decoder_model_path)
         sorted_output_names = decoder_hef.get_sorted_output_names()
         decoder_model_name = decoder_hef.get_network_group_names()[0]
         self.decoding_sequence_length = decoder_hef.get_output_vstream_infos()[0].shape[1]
 
-        with VDevice(params) as vdevice:
+        owns_vdevice = self.vdevice is None
+        if owns_vdevice:
+            vdevice = create_shared_vdevice()
+        else:
+            vdevice = self.vdevice
+
+        try:
             encoder_infer_model = vdevice.create_infer_model(self.encoder_model_path)
             decoder_infer_model = vdevice.create_infer_model(self.decoder_model_path)
             encoder_infer_model.input().set_format_type(FormatType.FLOAT32)
@@ -246,6 +262,9 @@ class HailoWhisperPipeline:
                             self.results_queue.put(transcription)
                         except Empty:
                             pass
+        finally:
+            if owns_vdevice:
+                vdevice.release()
 
     def get_model_input_audio_length(self):
         return self.input_audio_length

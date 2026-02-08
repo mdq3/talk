@@ -2,3 +2,4 @@ sounddevice
 torch
 transformers
 scipy
+piper-tts

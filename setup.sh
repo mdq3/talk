@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 VARIANT="${1:-base}"
+TTS_VOICE="${2:-en_US-amy-medium}"
 VENV_DIR="$SCRIPT_DIR/venv"
 MODELS_DIR="$SCRIPT_DIR/models"
 HAILORT_WHEEL="/usr/local/hailo/resources/packages/hailort-*-linux_aarch64.whl"
@@ -112,11 +113,27 @@ else
     wget -q --show-progress -O "$MODELS_DIR/mel_filters.npz" "$MEL_FILTERS_SRC"
 fi
 
+# --- Piper TTS voice model ---
+
+PIPER_DIR="$MODELS_DIR/piper"
+mkdir -p "$PIPER_DIR"
+
+ONNX_FILE="$PIPER_DIR/${TTS_VOICE}.onnx"
+JSON_FILE="$PIPER_DIR/${TTS_VOICE}.onnx.json"
+
+if [ -f "$ONNX_FILE" ] && [ -f "$JSON_FILE" ]; then
+    info "Piper voice '$TTS_VOICE' already downloaded."
+else
+    info "Downloading Piper voice '$TTS_VOICE'..."
+    "$VENV_DIR/bin/python" -m piper.download_voices "$TTS_VOICE" --download-dir "$PIPER_DIR"
+fi
+
 # --- Done ---
 
 echo ""
 echo "Setup complete! To run:"
 echo ""
 echo "  source venv/bin/activate"
-echo "  python talk.py"
+echo "  python talk.py              # transcribe only"
+echo "  python talk.py --chat       # voice chat with LLM + TTS"
 echo ""

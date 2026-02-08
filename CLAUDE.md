@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Speech-to-text app running OpenAI Whisper on a Raspberry Pi 5 with Hailo AI HAT+ (Hailo 10H) hardware acceleration. Records from a USB microphone, preprocesses the audio, runs inference on the Hailo NPU, and prints transcriptions.
+Speech-to-text app running OpenAI Whisper on a Raspberry Pi 5 with Hailo AI HAT+ (Hailo 10H) hardware acceleration. Records from a USB microphone, preprocesses the audio, runs inference on the Hailo NPU, and prints transcriptions. Optionally supports voice chat mode (`--chat`) that feeds transcriptions into an LLM and speaks responses via Piper TTS.
 
 ## Running
 
@@ -16,11 +16,18 @@ python talk.py --variant tiny.en  # english-only, hailo10h only
 python talk.py --duration 20      # record up to 20 seconds
 python talk.py --boost "Hailo:2.0" --boost "Raspberry:1.5"  # boost specific words
 python talk.py --boost-file custom.json                      # load boost words from file
+python talk.py --chat             # voice chat: STT → LLM → TTS (all on Hailo NPU)
+python talk.py --chat --no-tts    # text-only chat (no voice output)
+python talk.py --chat --llm-model qwen2.5-instruct           # different model
+python talk.py --chat --tts-voice en_GB-alba-medium          # different voice
+python talk.py --chat --system-prompt "You are a pirate."    # custom system prompt
 ```
 
 ## Setup
 
-Run `./setup.sh [variant]` to create the venv, install deps, and download models. The HailoRT Python wheel must be installed from `/usr/local/hailo/resources/packages/hailort-*-linux_aarch64.whl` — it is not on PyPI.
+Run `./setup.sh [variant] [tts-voice]` to create the venv, install deps, and download models (including Piper TTS voice). The HailoRT Python wheel must be installed from `/usr/local/hailo/resources/packages/hailort-*-linux_aarch64.whl` — it is not on PyPI.
+
+For chat mode, the LLM runs directly on the Hailo NPU sharing the same device as Whisper (no separate server needed). LLM models are pulled via `hailo-ollama pull <model>` and stored in `/usr/share/hailo-ollama/models/`.
 
 For development tools (ruff):
 
@@ -30,11 +37,11 @@ pip install -r requirements-dev.txt
 
 ## Architecture
 
-The app follows a record → preprocess → encode → decode → clean pipeline:
+The app follows a record → preprocess → encode → decode → clean pipeline, with an optional chat extension (→ LLM → TTS):
 
 1. **`talk.py`** — Thin CLI wrapper. Parses arguments and delegates to `lib/app.py`. Heavy imports are deferred so `--help` responds instantly.
 
-2. **`lib/app.py`** — Main run loop. Prompts user to record, orchestrates the record → preprocess → encode → decode → clean pipeline, prints transcriptions.
+2. **`lib/app.py`** — Main run loop. Prompts user to record, orchestrates the record → preprocess → encode → decode → clean pipeline, prints transcriptions. In chat mode, sends transcriptions to an LLM and speaks responses via TTS.
 
 3. **`lib/record_utils.py`** — Records from the default input device at its native sample rate (44100 Hz for the USB PnP Sound Device), then anti-alias filters and resamples to 16 kHz using `resample_poly`. Saves a WAV to `/tmp/talk_recording.wav`. Supports early stop via Enter key using `select`.
 
@@ -61,7 +68,11 @@ The app follows a record → preprocess → encode → decode → clean pipeline
 
 9. **`lib/spinner.py`** — Braille-dot loading spinner. `spinner(message)` returns `(done, thread)`; set `done` to stop.
 
-10. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default.
+10. **`lib/llm.py`** — `HailoLLM` class wrapping `hailo_platform.genai.LLM`. Runs the LLM on the Hailo NPU sharing the same VDevice as Whisper. Resolves model HEF paths from the hailo-ollama model store. `stream_to_terminal()` prints tokens as they arrive.
+
+11. **`lib/tts.py`** — Piper TTS wrapper. `PiperTTS` loads an ONNX voice model, synthesizes text to audio, and plays it via `sounddevice`. Includes `clean_text_for_tts()` to strip markdown and noisy characters before synthesis.
+
+12. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default.
 
 ## Testing
 
