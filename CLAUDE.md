@@ -14,6 +14,8 @@ python talk.py                    # default: base model on hailo10h
 python talk.py --variant tiny     # faster, less accurate
 python talk.py --variant tiny.en  # english-only, hailo10h only
 python talk.py --duration 20      # record up to 20 seconds
+python talk.py --boost "Hailo:2.0" --boost "Raspberry:1.5"  # boost specific words
+python talk.py --boost-file custom.json                      # load boost words from file
 ```
 
 ## Setup
@@ -42,9 +44,12 @@ The app follows a record → preprocess → encode → decode → clean pipeline
    - Encoder produces features from mel spectrograms; decoder autoregressively generates tokens
    - Uses HuggingFace `AutoTokenizer` (loaded offline via `local_files_only=True`) for token decoding
    - `HEF_REGISTRY` dict maps (variant, hw_arch) → HEF filenames
+   - Accepts optional `boost_words` dict to bias decoder logits toward target vocabulary during token selection
    - Communicates via `Queue`: `send_data()` to submit, `get_transcription()` to receive
 
-6. **`lib/postprocessing.py`** — Repetition penalty during decoding (penalizes recently-generated tokens in logits) and `clean_transcription()` to deduplicate repeated sentences in output.
+6. **`lib/postprocessing.py`** — Repetition penalty during decoding (penalizes recently-generated tokens in logits), word boost logit biasing (`apply_word_boost()`), and `clean_transcription()` to deduplicate repeated sentences in output.
+
+7. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default. CLI `--boost` args override entries from this file.
 
 ## Hardware Constraints
 
