@@ -63,6 +63,16 @@ The app follows a record → preprocess → encode → decode → clean pipeline
 
 10. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default.
 
+## Testing
+
+Tests live next to their source files with a `_test` suffix (e.g. `lib/preprocessing_test.py`).
+
+```bash
+pytest              # run all tests
+pytest lib/preprocessing_test.py  # run one file
+pytest -k "test_bandpass"         # run by name
+```
+
 ## Linting
 
 This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting, configured in `pyproject.toml` (Python 3.13, 100-char line length, `E`/`F`/`W`/`I` rules).

@@ -9,4 +9,5 @@ select = ["E", "F", "W", "I"]
 quote-style = "double"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [".", "lib"]
+python_files = ["*_test.py"]
