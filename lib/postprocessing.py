@@ -15,6 +15,13 @@ def apply_repetition_penalty(logits, generated_tokens, penalty=1.5, last_window=
     return logits
 
 
+def apply_word_boost(logits, boost_token_map, special_token_start=50257):
+    for token_id, boost_factor in boost_token_map.items():
+        if token_id < special_token_start:
+            logits[token_id] *= boost_factor
+    return logits
+
+
 def clean_transcription(transcription):
     sentences = re.split(r'(?<=[.?])\s+', transcription)
     unique_sentences = []

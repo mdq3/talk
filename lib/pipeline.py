@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 from queue import Queue, Empty
 from threading import Thread
 
-from .postprocessing import apply_repetition_penalty
+from .postprocessing import apply_repetition_penalty, apply_word_boost
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models")
 
@@ -65,7 +65,7 @@ def get_hef_paths(variant: str, hw_arch: str) -> tuple:
 
 
 class HailoWhisperPipeline:
-    def __init__(self, encoder_model_path: str, decoder_model_path: str, variant="base"):
+    def __init__(self, encoder_model_path: str, decoder_model_path: str, variant="base", boost_words=None):
         self.encoder_model_path = encoder_model_path
         self.decoder_model_path = decoder_model_path
         self.timeout_ms = 100000000
@@ -76,6 +76,7 @@ class HailoWhisperPipeline:
         self.onnx_add_input = self._load_onnx_add_input()
         self.constant_output_0 = np.array([1])
         self._load_tokenizer()
+        self.boost_token_map = self._build_boost_token_map(boost_words or {})
 
         encoder_hef = HEF(self.encoder_model_path)
         self.input_audio_length = int((encoder_hef.get_input_vstream_infos()[0].shape[1]) / 100)
@@ -107,6 +108,14 @@ class HailoWhisperPipeline:
         self.tokenizer = AutoTokenizer.from_pretrained(
             f"openai/whisper-{self.variant}", local_files_only=True
         )
+
+    def _build_boost_token_map(self, boost_words):
+        token_map = {}
+        for word, factor in boost_words.items():
+            token_ids = self.tokenizer.encode(word, add_special_tokens=False)
+            for tid in token_ids:
+                token_map[tid] = factor
+        return token_map
 
     def _tokenization(self, decoder_input_ids, add_embed=True):
         gather_output = self.token_embedding_weight[decoder_input_ids]
@@ -194,6 +203,8 @@ class HailoWhisperPipeline:
                                 logits = apply_repetition_penalty(
                                     decoder_outputs[:, i], generated_tokens, penalty=repetition_penalty
                                 )
+                                if self.boost_token_map:
+                                    logits = apply_word_boost(logits, self.boost_token_map)
                                 next_token = np.argmax(logits)
 
                                 generated_tokens.append(next_token)

@@ -2,6 +2,7 @@
 """Voice-to-text using Whisper on Hailo AI HAT+."""
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -35,7 +36,34 @@ def parse_args():
         default=10,
         help="Max recording duration in seconds (default: 10)",
     )
+    parser.add_argument(
+        "--boost",
+        action="append",
+        default=[],
+        help="Boost a word during decoding. Format: word:factor (default factor 1.5). Repeatable.",
+    )
+    default_boost_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "boost_words.json")
+    parser.add_argument(
+        "--boost-file",
+        type=str,
+        default=default_boost_file,
+        help="Path to JSON file with word boost factors (default: boost_words.json)",
+    )
     return parser.parse_args()
+
+
+def load_boost_words(args):
+    boost_words = {}
+    if args.boost_file and os.path.exists(args.boost_file):
+        with open(args.boost_file) as f:
+            boost_words = json.load(f)
+    for entry in args.boost:
+        if ":" in entry:
+            word, factor = entry.rsplit(":", 1)
+            boost_words[word] = float(factor)
+        else:
+            boost_words[entry] = 1.5
+    return boost_words
 
 
 def main():
@@ -46,8 +74,12 @@ def main():
 
     encoder_path, decoder_path = get_hef_paths(args.variant, args.hw_arch)
 
+    boost_words = load_boost_words(args)
+    if boost_words:
+        print(f"Word boost: {boost_words}")
+
     print("Loading Hailo Whisper pipeline...")
-    pipeline = HailoWhisperPipeline(encoder_path, decoder_path, args.variant)
+    pipeline = HailoWhisperPipeline(encoder_path, decoder_path, args.variant, boost_words=boost_words)
     print("Pipeline ready.")
 
     chunk_length = pipeline.get_model_input_audio_length()
