@@ -7,11 +7,6 @@ import os
 import sys
 import time
 
-from lib.pipeline import HailoWhisperPipeline, get_hef_paths
-from lib.audio_utils import load_audio
-from lib.preprocessing import preprocess, improve_input_audio
-from lib.postprocessing import clean_transcription
-from lib.record_utils import record_audio
 
 
 def parse_args():
@@ -68,6 +63,12 @@ def load_boost_words(args):
 
 def main():
     args = parse_args()
+
+    from lib.pipeline import HailoWhisperPipeline, get_hef_paths
+    from lib.audio_utils import load_audio
+    from lib.preprocessing import preprocess, improve_input_audio
+    from lib.postprocessing import clean_transcription
+    from lib.record_utils import record_audio
 
     print(f"Variant: whisper-{args.variant}")
     print(f"Hardware: {args.hw_arch}")
