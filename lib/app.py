@@ -45,12 +45,22 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
     chunk_length = pipeline.get_model_input_audio_length()
     audio_path = "/tmp/talk_recording.wav"
     chat_history = []
+    last_response = None
 
     try:
         while True:
-            user_input = input("\nPress Enter to record, or 'q' to quit: ")
-            if user_input.strip().lower() == "q":
+            tts = chat_opts["tts"] if chat_opts else None
+            if tts and last_response:
+                prompt = "\nPress Enter to record, 'r' to replay, or 'q' to quit: "
+            else:
+                prompt = "\nPress Enter to record, or 'q' to quit: "
+
+            user_input = input(prompt).strip().lower()
+            if user_input == "q":
                 break
+            if user_input == "r" and tts and last_response:
+                tts.speak(last_response)
+                continue
 
             record_audio(duration, audio_path)
 
@@ -76,7 +86,7 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
                 print(f"\n>>> {transcription}")
 
             if llm and transcription:
-                _chat_respond(transcription, llm, chat_opts, chat_history)
+                last_response = _chat_respond(transcription, llm, chat_opts, chat_history)
 
     except KeyboardInterrupt:
         print("\nInterrupted.")
@@ -118,10 +128,12 @@ def _chat_respond(transcription, llm, chat_opts, history):
         thread.join()
         print(f"\nLLM error: {e}")
         history.pop()
-        return
+        return None
 
     history.append({"role": "assistant", "content": response})
 
     tts = chat_opts["tts"]
     if tts and response.strip():
         tts.speak(response)
+
+    return response
