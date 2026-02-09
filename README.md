@@ -131,8 +131,9 @@ python talk.py
 3. Press **Enter** to stop recording early, or wait for the timeout
 4. The transcription appears as `>>> your text here`
 5. The LLM response streams to the terminal, then is spoken via TTS
-6. Press **r** then Enter to replay the last spoken response
-7. Type **q** then Enter to quit
+6. Type **w** then Enter to type a message instead of speaking
+7. Press **r** then Enter to replay the last spoken response
+8. Type **q** then Enter to quit
 
 ### Options
 
@@ -157,6 +158,7 @@ python talk.py --duration 20           # Record up to 20 seconds
 python talk.py --no-tts                # Text-only (no voice output)
 python talk.py --llm-model qwen2       # Use a different LLM model
 python talk.py --system-prompt "You are a pirate."  # Custom personality
+python talk.py --boost "Hailo:2.0" --boost "Raspberry:1.5"  # Boost specific words
 ```
 
 ## Model Variants
@@ -182,3 +184,7 @@ python talk.py --system-prompt "You are a pirate."  # Custom personality
 **TTS audio cuts off at start**: The app uses a persistent audio stream to keep the HDMI sink awake. If you still experience cutoff, check your audio output device with `python3 -c "import sounddevice; print(sounddevice.query_devices())"`.
 
 **`HAILO_OUT_OF_PHYSICAL_DEVICES`**: Another process is using the Hailo device. Stop any other Hailo applications (including `hailo-ollama serve`) before running talk.
+
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details on multi-model NPU inference, the audio pipeline, and hardware requirements.
