@@ -4,8 +4,6 @@ from queue import Empty, Queue
 from threading import Thread
 
 import numpy as np
-from hailo_platform import HEF, FormatType, HailoSchedulingAlgorithm, VDevice
-from transformers import AutoTokenizer
 
 from .postprocessing import apply_repetition_penalty, apply_word_boost
 
@@ -65,6 +63,8 @@ def get_hef_paths(variant: str, hw_arch: str) -> tuple:
 
 def create_shared_vdevice():
     """Create a VDevice with shared scheduling for multi-model inference."""
+    from hailo_platform import HailoSchedulingAlgorithm, VDevice
+
     params = VDevice.create_params()
     params.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
     params.group_id = "SHARED"
@@ -92,6 +92,8 @@ class HailoWhisperPipeline:
         self.constant_output_0 = np.array([1])
         self._load_tokenizer()
         self.boost_token_map = self._build_boost_token_map(boost_words or {})
+
+        from hailo_platform import HEF
 
         encoder_hef = HEF(self.encoder_model_path)
         self.input_audio_length = int((encoder_hef.get_input_vstream_infos()[0].shape[1]) / 100)
@@ -122,6 +124,8 @@ class HailoWhisperPipeline:
         # once before (e.g. via:
         #   python -c "from transformers import AutoTokenizer; \
         #     AutoTokenizer.from_pretrained('openai/whisper-base')")
+        from transformers import AutoTokenizer
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             f"openai/whisper-{self.variant}", local_files_only=True
         )
@@ -146,6 +150,8 @@ class HailoWhisperPipeline:
             return unsqueeze_output
 
     def _inference_loop(self):
+        from hailo_platform import HEF, FormatType
+
         decoder_hef = HEF(self.decoder_model_path)
         sorted_output_names = decoder_hef.get_sorted_output_names()
         decoder_model_name = decoder_hef.get_network_group_names()[0]
