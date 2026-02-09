@@ -1,5 +1,6 @@
 venv/
 models/
+!models/mel_filters.npz
 __pycache__/
 *.pyc
 *.wav
