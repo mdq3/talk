@@ -78,7 +78,7 @@ def loading(message, func, done_message=None, spin_message=None):
         sys.stdout.write("\r\033[K")
         sys.stdout.flush()
 
-    print(done_message)
+    print(f"✔ {done_message}")
     return result
 
 
