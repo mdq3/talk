@@ -84,6 +84,10 @@ pytest lib/preprocessing_test.py  # run one file
 pytest -k "test_bandpass"         # run by name
 ```
 
+## Documentation
+
+Keep `ARCHITECTURE.md` up to date when changing the application structure, data flow, hardware requirements, or multi-model inference setup.
+
 ## Linting
 
 This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting, configured in `pyproject.toml` (Python 3.13, 100-char line length, `E`/`F`/`W`/`I` rules).
