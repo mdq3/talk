@@ -4,7 +4,6 @@ from threading import Event, Thread
 
 SPINNER_CHARS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
-
 def _spin(message, done):
     for char in cycle(SPINNER_CHARS):
         if done.is_set():
@@ -12,7 +11,7 @@ def _spin(message, done):
         sys.stdout.write(f"\r{char} {message}")
         sys.stdout.flush()
         done.wait(0.08)
-    sys.stdout.write("\r")
+    sys.stdout.write("\r\033[K")
     sys.stdout.flush()
 
 
