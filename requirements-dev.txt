@@ -1,5 +1,4 @@
 ruff
 pytest
 pytest-cov
-coverage-badge
-setuptools
+genbadge[coverage]

@@ -6,4 +6,5 @@ __pycache__/
 *.wav
 hailort.log
 coverage.json
+coverage.xml
 .coverage
