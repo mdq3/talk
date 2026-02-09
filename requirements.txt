@@ -1,3 +1,4 @@
+noisereduce
 sounddevice
 torch
 transformers
