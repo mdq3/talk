@@ -90,7 +90,7 @@ def main():
         from lib.boost_words import load_boost_words
         return run, load_boost_words
 
-    run, load_boost_words = loading("dependencies", _import)
+    run, load_boost_words = loading("tools", _import)
 
     boost_words = load_boost_words(args.boost_file, args.boost)
 
