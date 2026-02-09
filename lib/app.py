@@ -1,14 +1,14 @@
 import sys
 import time
 
-GREEN = "\033[32m"
-RESET = "\033[0m"
-
 from .audio_utils import load_audio
 from .pipeline import HailoWhisperPipeline, create_shared_vdevice, get_hef_paths
 from .postprocessing import clean_transcription
 from .preprocessing import improve_input_audio, preprocess
 from .record_utils import record_audio
+
+GREEN = "\033[32m"
+RESET = "\033[0m"
 
 
 def run(variant, hw_arch, duration, boost_words, chat_opts=None):
@@ -91,6 +91,7 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
     except KeyboardInterrupt:
         print("\nInterrupted.")
     finally:
+
         def _shutdown():
             pipeline.stop()
             if llm:

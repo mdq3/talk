@@ -88,6 +88,7 @@ def main():
     def _import():
         from lib.app import run
         from lib.boost_words import load_boost_words
+
         return run, load_boost_words
 
     run, load_boost_words = loading("tools", _import)
