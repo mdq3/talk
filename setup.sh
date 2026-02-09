@@ -38,6 +38,8 @@ if ! hailortcli fw-control identify &>/dev/null; then
     error "Hailo device not detected. Check your AI HAT+ connection."
 fi
 
+command -v hailo-ollama >/dev/null || error "hailo-ollama not found. Install with: sudo apt install hailo-ollama"
+
 case "$VARIANT" in
     base|tiny|tiny.en) ;;
     *) error "Unknown variant '$VARIANT'. Choose: base, tiny, tiny.en" ;;

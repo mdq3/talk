@@ -97,6 +97,9 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
             llm.release()
         if vdevice:
             vdevice.release()
+        tts = chat_opts["tts"] if chat_opts else None
+        if tts:
+            tts.close()
         print("Done.")
 
 

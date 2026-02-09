@@ -4,29 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Speech-to-text app running OpenAI Whisper on a Raspberry Pi 5 with Hailo AI HAT+ (Hailo 10H) hardware acceleration. Records from a USB microphone, preprocesses the audio, runs inference on the Hailo NPU, and prints transcriptions. Optionally supports voice chat mode (`--chat`) that feeds transcriptions into an LLM and speaks responses via Piper TTS.
+Voice chat app running on a Raspberry Pi 5 with Hailo AI HAT+ (Hailo 10H). Records speech from a USB microphone, transcribes via Whisper on the Hailo NPU, sends transcriptions to an LLM (also on the Hailo NPU), and speaks responses via Piper TTS. Both Whisper and the LLM share a single Hailo VDevice for efficient multi-model inference.
 
 ## Running
 
 ```bash
 source venv/bin/activate
-python talk.py                    # default: base model on hailo10h
+python talk.py                    # voice chat: STT → LLM → TTS
+python talk.py --no-tts           # text-only (no voice output)
 python talk.py --variant tiny     # faster, less accurate
 python talk.py --variant tiny.en  # english-only, hailo10h only
 python talk.py --duration 20      # record up to 20 seconds
 python talk.py --boost "Hailo:2.0" --boost "Raspberry:1.5"  # boost specific words
 python talk.py --boost-file custom.json                      # load boost words from file
-python talk.py --no-tts           # text-only (no voice output)
-python talk.py --llm-model qwen2.5-instruct                  # different LLM model
-python talk.py --tts-voice en_GB-alba-medium                  # different TTS voice
-python talk.py --system-prompt "You are a pirate."            # custom system prompt
+python talk.py --llm-model qwen2                             # different LLM model
+python talk.py --tts-voice en_GB-alba-medium                 # different TTS voice
+python talk.py --system-prompt "You are a pirate."           # custom system prompt
 ```
 
 ## Setup
 
 Run `./setup.sh [variant] [tts-voice]` to create the venv, install deps, and download models (including Piper TTS voice). The HailoRT Python wheel must be installed from `/usr/local/hailo/resources/packages/hailort-*-linux_aarch64.whl` — it is not on PyPI.
 
-For chat mode, the LLM runs directly on the Hailo NPU sharing the same device as Whisper (no separate server needed). LLM models are pulled via `hailo-ollama pull <model>` and stored in `/usr/share/hailo-ollama/models/`.
+The LLM runs directly on the Hailo NPU sharing the same VDevice as Whisper (no separate server needed). LLM models are managed via `hailo-ollama pull <model>` and stored in `/usr/share/hailo-ollama/models/`.
 
 For development tools (ruff):
 
@@ -36,11 +36,11 @@ pip install -r requirements-dev.txt
 
 ## Architecture
 
-The app follows a record → preprocess → encode → decode → clean pipeline, with an optional chat extension (→ LLM → TTS):
+The app follows a record → preprocess → encode → decode → clean → LLM → TTS pipeline:
 
 1. **`talk.py`** — Thin CLI wrapper. Parses arguments and delegates to `lib/app.py`. Heavy imports are deferred so `--help` responds instantly.
 
-2. **`lib/app.py`** — Main run loop. Prompts user to record, orchestrates the record → preprocess → encode → decode → clean pipeline, prints transcriptions. In chat mode, sends transcriptions to an LLM and speaks responses via TTS.
+2. **`lib/app.py`** — Main run loop. Creates a shared Hailo VDevice, loads the LLM and Whisper pipeline on it, then loops: prompt user → record → preprocess → transcribe → send to LLM (streaming) → speak response via TTS. Supports 'r' to replay the last response and 'q' to quit.
 
 3. **`lib/record_utils.py`** — Records from the default input device at its native sample rate (44100 Hz for the USB PnP Sound Device), then anti-alias filters and resamples to 16 kHz using `resample_poly`. Saves a WAV to `/tmp/talk_recording.wav`. Supports early stop via Enter key using `select`.
 
@@ -55,6 +55,7 @@ The app follows a record → preprocess → encode → decode → clean pipeline
 
 6. **`lib/pipeline.py`** — `HailoWhisperPipeline` class that manages Hailo device inference:
    - Runs encoder + decoder on a background thread via `VDevice` with round-robin scheduling
+   - Accepts an optional external `vdevice` for sharing with the LLM; `create_shared_vdevice()` creates one with `group_id="SHARED"`
    - Encoder produces features from mel spectrograms; decoder autoregressively generates tokens
    - Uses HuggingFace `AutoTokenizer` (loaded offline via `local_files_only=True`) for token decoding
    - `HEF_REGISTRY` dict maps (variant, hw_arch) → HEF filenames
@@ -69,7 +70,7 @@ The app follows a record → preprocess → encode → decode → clean pipeline
 
 10. **`lib/llm.py`** — `HailoLLM` class wrapping `hailo_platform.genai.LLM`. Runs the LLM on the Hailo NPU sharing the same VDevice as Whisper. Resolves model HEF paths from the hailo-ollama model store. `stream_to_terminal()` prints tokens as they arrive.
 
-11. **`lib/tts.py`** — Piper TTS wrapper. `PiperTTS` loads an ONNX voice model, synthesizes text to audio, and plays it via `sounddevice`. Includes `clean_text_for_tts()` to strip markdown and noisy characters before synthesis.
+11. **`lib/tts.py`** — Piper TTS wrapper. `PiperTTS` loads an ONNX voice model, synthesizes text to audio, and plays via a callback-based `sounddevice.OutputStream` that continuously feeds silence to keep the HDMI sink awake (prevents audio cutoff at start of playback). Resamples from Piper's native rate to the output device rate. Includes `clean_text_for_tts()` to strip markdown and noisy characters before synthesis.
 
 12. **`boost_words.json`** — Default word boost config loaded automatically. Maps words to boost factors (e.g. `{"Hailo": 2.0}`). Empty by default.
 

@@ -1,12 +1,14 @@
-# Talk - Speech-to-Text on Hailo AI HAT+
+# Talk - Voice Chat on Hailo AI HAT+
 
-Voice-to-text application that runs OpenAI Whisper on a Raspberry Pi 5 with Hailo AI HAT+ hardware acceleration. Speak into a USB microphone and see the transcription printed to your terminal.
+Voice chat application running on a Raspberry Pi 5 with Hailo AI HAT+. Speak into a USB microphone, get transcriptions via Whisper, responses from an LLM, and hear them spoken back via Piper TTS — all accelerated on the Hailo NPU.
 
 ## Prerequisites
 
 - Raspberry Pi 5 with AI HAT+ (Hailo 8, 8L, or 10H)
 - USB microphone
+- Audio output (HDMI or other)
 - HailoRT 5.1.1 installed (the `hailort` system package)
+- `hailo-ollama` installed (`sudo apt install hailo-ollama`) — for LLM model management
 - Python 3.13+
 - `ffmpeg` installed (`sudo apt install ffmpeg`)
 - `libportaudio2` installed (`sudo apt install libportaudio2`)
@@ -19,12 +21,19 @@ hailortcli fw-control identify
 
 ## Quick Setup
 
-The setup script handles everything -- creates the virtual environment, installs dependencies, and downloads model files:
+The setup script handles everything — creates the virtual environment, installs dependencies, and downloads model files:
 
 ```bash
-./setup.sh          # defaults to whisper base model
+./setup.sh          # defaults to whisper base model + en_US-amy-medium TTS voice
 ./setup.sh tiny     # use tiny model instead
 ./setup.sh tiny.en  # english-only tiny model
+./setup.sh base en_GB-alba-medium  # different TTS voice
+```
+
+You also need an LLM model downloaded for chat. Pull one via `hailo-ollama`:
+
+```bash
+hailo-ollama pull qwen2
 ```
 
 ## Manual Setup
@@ -105,6 +114,9 @@ models/
   decoder_assets/base/decoder_tokenization/
     token_embedding_weight_base.npy
     onnx_add_input_base.npy
+  piper/
+    en_US-amy-medium.onnx
+    en_US-amy-medium.onnx.json
 ```
 
 ## Usage
@@ -118,14 +130,22 @@ python talk.py
 2. Speak into the microphone
 3. Press **Enter** to stop recording early, or wait for the timeout
 4. The transcription appears as `>>> your text here`
-5. Type **q** then Enter to quit
+5. The LLM response streams to the terminal, then is spoken via TTS
+6. Press **r** then Enter to replay the last spoken response
+7. Type **q** then Enter to quit
 
 ### Options
 
 ```
---variant {base,tiny,tiny.en}   Whisper model variant (default: base)
---hw-arch {hailo8,hailo8l,hailo10h}   Hailo architecture (default: hailo10h)
---duration SECONDS              Max recording duration (default: 10)
+--variant {base,tiny,tiny.en}          Whisper model variant (default: base)
+--hw-arch {hailo8,hailo8l,hailo10h}    Hailo architecture (default: hailo10h)
+--duration SECONDS                     Max recording duration (default: 10)
+--llm-model MODEL                      LLM model name (default: qwen2)
+--tts-voice VOICE                      Piper TTS voice (default: en_US-amy-medium)
+--no-tts                               Disable TTS voice output (text-only)
+--system-prompt PROMPT                 Override the default LLM system prompt
+--boost "word:factor"                  Boost a word during decoding (repeatable)
+--boost-file PATH                      JSON file with word boost factors
 ```
 
 Examples:
@@ -134,6 +154,9 @@ Examples:
 python talk.py --variant tiny          # Faster, less accurate
 python talk.py --variant tiny.en       # English-only (hailo10h only)
 python talk.py --duration 20           # Record up to 20 seconds
+python talk.py --no-tts                # Text-only (no voice output)
+python talk.py --llm-model qwen2       # Use a different LLM model
+python talk.py --system-prompt "You are a pirate."  # Custom personality
 ```
 
 ## Model Variants
@@ -153,3 +176,9 @@ python talk.py --duration 20           # Record up to 20 seconds
 **`HEF file not found`**: Make sure you downloaded the model files for the correct architecture and variant (step 4 above). Check that the filenames match what's listed in `lib/pipeline.py` HEF_REGISTRY.
 
 **No speech detected**: Speak louder or closer to the microphone. The app applies voice activity detection and will skip recordings with no audible speech.
+
+**`LLM model not found`**: Make sure you've pulled the model via `hailo-ollama pull qwen2` (or whichever model you're using with `--llm-model`).
+
+**TTS audio cuts off at start**: The app uses a persistent audio stream to keep the HDMI sink awake. If you still experience cutoff, check your audio output device with `python3 -c "import sounddevice; print(sounddevice.query_devices())"`.
+
+**`HAILO_OUT_OF_PHYSICAL_DEVICES`**: Another process is using the Hailo device. Stop any other Hailo applications (including `hailo-ollama serve`) before running talk.
