@@ -50,10 +50,11 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
     try:
         while True:
             tts = chat_opts["tts"] if chat_opts else None
+            opts = ["'w' to type"]
             if tts and last_response:
-                prompt = "\nPress Enter to record, 'r' to replay, or 'q' to quit: "
-            else:
-                prompt = "\nPress Enter to record, or 'q' to quit: "
+                opts.append("'r' to replay")
+            opts.append("'q' to quit")
+            prompt = f"\nPress Enter to record, {', '.join(opts)}: "
 
             user_input = input(prompt).strip().lower()
             if user_input == "q":
@@ -62,28 +63,33 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
                 tts.speak(last_response)
                 continue
 
-            record_audio(duration, audio_path)
+            if user_input == "w":
+                transcription = input(">>> ").strip()
+                if not transcription:
+                    continue
+            else:
+                record_audio(duration, audio_path)
 
-            audio = load_audio(audio_path)
-            audio, start_time = improve_input_audio(audio, vad=True)
+                audio = load_audio(audio_path)
+                audio, start_time = improve_input_audio(audio, vad=True)
 
-            if start_time is None:
-                print("No speech detected. Try again.")
-                continue
+                if start_time is None:
+                    print("No speech detected. Try again.")
+                    continue
 
-            chunk_offset = max(0, start_time - 0.2)
-            mel_spectrograms = preprocess(
-                audio,
-                is_nhwc=True,
-                chunk_length=chunk_length,
-                chunk_offset=chunk_offset,
-            )
+                chunk_offset = max(0, start_time - 0.2)
+                mel_spectrograms = preprocess(
+                    audio,
+                    is_nhwc=True,
+                    chunk_length=chunk_length,
+                    chunk_offset=chunk_offset,
+                )
 
-            for mel in mel_spectrograms:
-                pipeline.send_data(mel)
-                time.sleep(0.1)
-                transcription = clean_transcription(pipeline.get_transcription())
-                print(f"\n>>> {transcription}")
+                for mel in mel_spectrograms:
+                    pipeline.send_data(mel)
+                    time.sleep(0.1)
+                    transcription = clean_transcription(pipeline.get_transcription())
+                    print(f"\n>>> {transcription}")
 
             if llm and transcription:
                 last_response = _chat_respond(transcription, llm, chat_opts, chat_history)
