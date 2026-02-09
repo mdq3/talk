@@ -12,38 +12,28 @@ from .record_utils import record_audio
 
 
 def run(variant, hw_arch, duration, boost_words, chat_opts=None):
-    print(f"Variant: whisper-{variant}")
-    print(f"Hardware: {hw_arch}")
+    from .spinner import loading
 
     encoder_path, decoder_path = get_hef_paths(variant, hw_arch)
-
-    if boost_words:
-        print(f"Word boost: {boost_words}")
 
     llm = None
     vdevice = None
 
     if chat_opts:
-        print(f"Chat mode: {chat_opts['llm_model']}")
-        if chat_opts["tts"]:
-            print("TTS: enabled")
-        else:
-            print("TTS: disabled")
-
-        # Create shared VDevice for both Whisper and LLM
         from .llm import HailoLLM
 
-        print("Creating shared Hailo device...")
-        vdevice = create_shared_vdevice()
+        vdevice = loading("Hailo device", create_shared_vdevice)
+        llm = loading(
+            f"LLM ({chat_opts['llm_model']})",
+            lambda: HailoLLM(vdevice, chat_opts["llm_model"]),
+        )
 
-        print(f"Loading LLM ({chat_opts['llm_model']})...")
-        llm = HailoLLM(vdevice, chat_opts["llm_model"])
-
-    print("Loading Hailo Whisper pipeline...")
-    pipeline = HailoWhisperPipeline(
-        encoder_path, decoder_path, variant, boost_words=boost_words, vdevice=vdevice
+    pipeline = loading(
+        f"Whisper ({variant})",
+        lambda: HailoWhisperPipeline(
+            encoder_path, decoder_path, variant, boost_words=boost_words, vdevice=vdevice
+        ),
     )
-    print("Pipeline ready.")
 
     chunk_length = pipeline.get_model_input_audio_length()
     audio_path = "/tmp/talk_recording.wav"

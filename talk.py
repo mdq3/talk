@@ -4,7 +4,7 @@
 import argparse
 import os
 
-from lib.spinner import spinner
+from lib.spinner import loading
 
 
 def parse_args():
@@ -73,21 +73,24 @@ def parse_args():
 def main():
     args = parse_args()
 
-    done, thread = spinner("Loading...")
-
     # Create TTS first so the audio stream warms up during heavy Hailo imports
     tts = None
     if not args.no_tts:
-        from lib.tts import PiperTTS
 
-        models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "piper")
-        tts = PiperTTS(models_dir, args.tts_voice)
+        def _load_tts():
+            from lib.tts import PiperTTS
 
-    from lib.app import run
-    from lib.boost_words import load_boost_words
+            models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "piper")
+            return PiperTTS(models_dir, args.tts_voice)
 
-    done.set()
-    thread.join()
+        tts = loading("TTS voice", _load_tts)
+
+    def _import():
+        from lib.app import run
+        from lib.boost_words import load_boost_words
+        return run, load_boost_words
+
+    run, load_boost_words = loading("dependencies", _import)
 
     boost_words = load_boost_words(args.boost_file, args.boost)
 
