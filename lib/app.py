@@ -91,16 +91,17 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
     except KeyboardInterrupt:
         print("\nInterrupted.")
     finally:
-        print("Shutting down...")
-        pipeline.stop()
-        if llm:
-            llm.release()
-        if vdevice:
-            vdevice.release()
-        tts = chat_opts["tts"] if chat_opts else None
-        if tts:
-            tts.close()
-        print("Done.")
+        def _shutdown():
+            pipeline.stop()
+            if llm:
+                llm.release()
+            if vdevice:
+                vdevice.release()
+            tts = chat_opts["tts"] if chat_opts else None
+            if tts:
+                tts.close()
+
+        loading("shutdown", _shutdown, spin_message="Shutting down...", done_message="Done.")
 
 
 def _chat_respond(transcription, llm, chat_opts, history):

@@ -16,18 +16,22 @@ def spinner(message):
     return done, thread
 
 
-def loading(message, func):
+def loading(message, func, done_message=None, spin_message=None):
     """Run func() while showing a spinner in a forked child process.
 
     The child process has its own GIL, so the spinner stays animated even
     when func() runs GIL-holding C extension code.
     """
+    if done_message is None:
+        done_message = f"Loaded {message}."
+    spin_text = spin_message or f"Loading {message}..."
+
     pid = os.fork()
     if pid == 0:
         i = 0
         try:
             while True:
-                os.write(1, f"\r{SPINNER_CHARS[i % 10]} Loading {message}...".encode())
+                os.write(1, f"\r{SPINNER_CHARS[i % 10]} {spin_text}".encode())
                 time.sleep(0.08)
                 i += 1
         except BaseException:
@@ -42,7 +46,7 @@ def loading(message, func):
         sys.stdout.write("\r\033[K")
         sys.stdout.flush()
 
-    print(f"Loaded {message}.")
+    print(done_message)
     return result
 
 
