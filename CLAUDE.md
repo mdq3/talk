@@ -76,7 +76,7 @@ The app follows a record → preprocess → encode → decode → clean → LLM 
 
 ## Testing
 
-Tests live next to their source files with a `_test` suffix (e.g. `lib/preprocessing_test.py`).
+Tests live next to their source files with a `_test` suffix (e.g. `lib/preprocessing_test.py`). All new code should have unit tests for any testable logic (pure functions, parsers, data transforms). Hardware-dependent code (Hailo, audio devices) is excluded.
 
 ```bash
 pytest              # run all tests

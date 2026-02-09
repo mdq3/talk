@@ -52,3 +52,31 @@ class TestParseArgs:
         with patch("sys.argv", ["talk.py", "--boost-file", "/tmp/custom.json"]):
             args = parse_args()
         assert args.boost_file == "/tmp/custom.json"
+
+    def test_defaults_chat_opts(self):
+        with patch("sys.argv", ["talk.py"]):
+            args = parse_args()
+        assert args.llm_model == "qwen2"
+        assert args.tts_voice == "en_US-amy-medium"
+        assert args.no_tts is False
+        assert args.system_prompt is None
+
+    def test_llm_model(self):
+        with patch("sys.argv", ["talk.py", "--llm-model", "llama3"]):
+            args = parse_args()
+        assert args.llm_model == "llama3"
+
+    def test_tts_voice(self):
+        with patch("sys.argv", ["talk.py", "--tts-voice", "en_GB-alba-medium"]):
+            args = parse_args()
+        assert args.tts_voice == "en_GB-alba-medium"
+
+    def test_no_tts(self):
+        with patch("sys.argv", ["talk.py", "--no-tts"]):
+            args = parse_args()
+        assert args.no_tts is True
+
+    def test_system_prompt(self):
+        with patch("sys.argv", ["talk.py", "--system-prompt", "You are a pirate."]):
+            args = parse_args()
+        assert args.system_prompt == "You are a pirate."
