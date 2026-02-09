@@ -1,5 +1,8 @@
 # Talk - Voice Chat on Hailo AI HAT+
 
+![Tests](https://github.com/mdq3/talk/actions/workflows/tests.yml/badge.svg)
+![Coverage](https://raw.githubusercontent.com/mdq3/talk/main/coverage.svg)
+
 Voice chat application running on a Raspberry Pi 5 with Hailo AI HAT+. Speak into a USB microphone, get transcriptions via Whisper, responses from an LLM, and hear them spoken back via Piper TTS — all accelerated on the Hailo NPU.
 
 ## Prerequisites
