@@ -66,30 +66,12 @@ class PiperTTS:
     """
 
     def __init__(self, model_dir, voice_name=DEFAULT_VOICE):
-        onnx_path = f"{model_dir}/{voice_name}.onnx"
-
-        def _load():
-            from piper import PiperVoice
-
-            return PiperVoice.load(onnx_path)
-
-        self.voice = _suppress_native_stderr(_load)
-        self.native_rate = self.voice.config.sample_rate
-
+        # Start audio stream immediately to warm up the HDMI sink.
+        # This must happen before the slow voice model load so the sink
+        # has maximum time to lock onto the stream before first playback.
         dev = sd.query_devices(kind="output")
         self.playback_rate = int(dev["default_samplerate"])
 
-        # Compute resampling factors once
-        if self.playback_rate != self.native_rate:
-            divisor = gcd(self.native_rate, self.playback_rate)
-            self._resample_up = self.playback_rate // divisor
-            self._resample_down = self.native_rate // divisor
-        else:
-            self._resample_up = None
-            self._resample_down = None
-
-        # Audio playback via a callback stream that continuously runs.
-        # Feeds silence when idle so the HDMI sink never sleeps.
         self._audio_queue = queue.Queue()
         self._audio_buf = np.empty(0, dtype=np.float32)
         self._done_event = threading.Event()
@@ -100,6 +82,25 @@ class PiperTTS:
             callback=self._audio_callback,
         )
         self._stream.start()
+
+        # Load voice model (slow — imports piper, loads ONNX)
+        onnx_path = f"{model_dir}/{voice_name}.onnx"
+
+        def _load():
+            from piper import PiperVoice
+
+            return PiperVoice.load(onnx_path)
+
+        self.voice = _suppress_native_stderr(_load)
+        self.native_rate = self.voice.config.sample_rate
+
+        if self.playback_rate != self.native_rate:
+            divisor = gcd(self.native_rate, self.playback_rate)
+            self._resample_up = self.playback_rate // divisor
+            self._resample_down = self.native_rate // divisor
+        else:
+            self._resample_up = None
+            self._resample_down = None
 
     def _audio_callback(self, outdata, frames, time_info, status):
         """Fill the output buffer from queued audio, or silence if idle."""
@@ -154,6 +155,11 @@ class PiperTTS:
 
         if self._resample_up is not None:
             audio = resample_poly(audio, self._resample_up, self._resample_down).astype(np.float32)
+
+        # Pad 300ms of silence before speech so any audio pipeline transition
+        # glitch (HDMI/PipeWire first-audio latency) doesn't eat real speech.
+        pad = np.zeros(int(self.playback_rate * 0.3), dtype=np.float32)
+        audio = np.concatenate([pad, audio])
 
         self._done_event.clear()
         self._audio_queue.put(audio)

@@ -75,15 +75,16 @@ def main():
 
     done, thread = spinner("Loading...")
 
-    from lib.app import run
-    from lib.boost_words import load_boost_words
-
+    # Create TTS first so the audio stream warms up during heavy Hailo imports
     tts = None
     if not args.no_tts:
         from lib.tts import PiperTTS
 
         models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "piper")
         tts = PiperTTS(models_dir, args.tts_voice)
+
+    from lib.app import run
+    from lib.boost_words import load_boost_words
 
     done.set()
     thread.join()
