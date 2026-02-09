@@ -2,6 +2,7 @@ import os
 import signal
 import sys
 import time
+import warnings
 from itertools import cycle
 from threading import Event, Thread
 
@@ -56,7 +57,10 @@ def loading(message, func, done_message=None, spin_message=None):
     n_frames = len(frames)
     n_spin = len(SPINNER_CHARS)
 
-    pid = os.fork()
+    # Safe to fork: child only does os.write() and time.sleep(), no shared state.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        pid = os.fork()
     if pid == 0:
         i = 0
         try:
