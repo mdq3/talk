@@ -7,6 +7,9 @@ import json
 import os
 import sys
 
+LIGHT_BLUE = "\033[38;5;75m"
+RESET = "\033[0m"
+
 DEFAULT_SYSTEM_PROMPT = "Respond in up to three sentences."
 DEFAULT_LLM_MODEL = "qwen2"
 
@@ -75,10 +78,11 @@ class HailoLLM:
 
 def stream_to_terminal(token_generator):
     """Print tokens as they arrive and return the full response text."""
+    sys.stdout.write(LIGHT_BLUE)
     full = []
     for token in token_generator:
         sys.stdout.write(token)
         sys.stdout.flush()
         full.append(token)
-    print()
+    print(RESET)
     return "".join(full)

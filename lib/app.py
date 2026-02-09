@@ -1,6 +1,9 @@
 import sys
 import time
 
+GREEN = "\033[32m"
+RESET = "\033[0m"
+
 from .audio_utils import load_audio
 from .pipeline import HailoWhisperPipeline, create_shared_vdevice, get_hef_paths
 from .postprocessing import clean_transcription
@@ -64,7 +67,8 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
                 continue
 
             if user_input == "w":
-                transcription = input(">>> ").strip()
+                transcription = input(f"{GREEN}>>> ").strip()
+                sys.stdout.write(RESET)
                 if not transcription:
                     continue
             else:
@@ -89,7 +93,7 @@ def run(variant, hw_arch, duration, boost_words, chat_opts=None):
                     pipeline.send_data(mel)
                     time.sleep(0.1)
                     transcription = clean_transcription(pipeline.get_transcription())
-                    print(f"\n>>> {transcription}")
+                    print(f"\n{GREEN}>>> {transcription}{RESET}")
 
             if llm and transcription:
                 last_response = _chat_respond(transcription, llm, chat_opts, chat_history)
